@@ -16,9 +16,10 @@ const StudentDetailPage = () => {
             if (!id) return;
             setLoading(true);
             const { data, error } = await supabase
-                .from('students')
-                .select('*')
+                .from('profiles')
+                .select('id, full_name, email, course, phone, created_at')
                 .eq('id', id)
+                .eq('role', 'Student')
                 .single();
 
             if (error) {
@@ -46,7 +47,7 @@ const StudentDetailPage = () => {
             <DetailItem label="Full Name" value={student.full_name} />
             <DetailItem label="Email" value={student.email} />
             <DetailItem label="Course" value={student.course} />
-            <DetailItem label="Contact" value={student.contact} />
+            <DetailItem label="Phone" value={student.phone} />
             <DetailItem label="Joined On" value={student.created_at ? new Date(student.created_at).toLocaleDateString() : 'N/A'} />
         </DetailPageLayout>
          <div className="mt-8">

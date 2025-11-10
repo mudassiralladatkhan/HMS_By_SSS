@@ -35,16 +35,18 @@ function AdminDashboard() {
             setLoading(true);
             try {
                 const [
-                    studentsRes, roomsRes, maintenanceRes, feesRes,
-                    noticesRes, paymentsRes, paidFeesRes
+                    studentsRes, roomsRes, maintenanceRes, overdueFeesRes,
+                    noticesRes, paymentsRes, paidFeesRes, allFeesRes, allStudentsRes
                 ] = await Promise.all([
-                    supabase.from('students').select('*', { count: 'exact', head: true }),
+                    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'Student'),
                     supabase.from('rooms').select('status'),
                     supabase.from('maintenance_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'),
                     supabase.from('fees').select('*', { count: 'exact', head: true }).eq('status', 'Overdue'),
                     supabase.from('notices').select('id, title, created_at').limit(5).order('created_at', { ascending: false }),
-                    supabase.from('payments').select('id, amount, paid_on, fees(students(full_name))').limit(5).order('paid_on', { ascending: false }),
-                    supabase.from('fees').select('amount, created_at').eq('status', 'Paid')
+                    supabase.from('payments').select('id, amount, paid_on, fee_id').limit(5).order('paid_on', { ascending: false }),
+                    supabase.from('fees').select('amount, created_at').eq('status', 'Paid'),
+                    supabase.from('fees').select('id, student_id'),
+                    supabase.from('profiles').select('id, full_name').eq('role', 'Student'),
                 ]);
 
                 // Process Stats
@@ -54,14 +56,29 @@ function AdminDashboard() {
                     totalStudents: studentsRes.count || 0,
                     occupancyRate: totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0,
                     pendingMaintenance: maintenanceRes.count || 0,
-                    overdueFees: feesRes.count || 0
+                    overdueFees: overdueFeesRes.count || 0
                 });
 
                 // Process Notices
                 setNotices(noticesRes.data || []);
 
                 // Process Recent Payments
-                setRecentPayments(paymentsRes.data || []);
+                const feesMap = new Map((allFeesRes.data || []).map(f => [f.id, f.student_id]));
+                const studentsMap = new Map((allStudentsRes.data || []).map(s => [s.id, s.full_name]));
+
+                const formattedPayments = (paymentsRes.data || []).map(p => {
+                    const studentId = feesMap.get(p.fee_id);
+                    const studentName = studentsMap.get(studentId);
+                    return {
+                        ...p,
+                        fees: {
+                            students: {
+                                full_name: studentName || 'N/A'
+                            }
+                        }
+                    };
+                });
+                setRecentPayments(formattedPayments);
 
                 // Process Chart Data
                 const monthlyCollections = (paidFeesRes.data || []).reduce((acc, fee) => {

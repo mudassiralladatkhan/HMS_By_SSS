@@ -41,7 +41,7 @@ const MaintenancePage = () => {
             const [requestsResult, profilesResult] = await Promise.all([
                  supabase
                     .from('maintenance_requests')
-                    .select('*, profiles:reported_by_id(full_name)')
+                    .select('*')
                     .order('created_at', { ascending: false }),
                 supabase
                     .from('profiles')
@@ -52,8 +52,16 @@ const MaintenancePage = () => {
             if (requestsResult.error) throw requestsResult.error;
             if (profilesResult.error) throw profilesResult.error;
     
-            setRequests(requestsResult.data || []);
-            setProfiles(profilesResult.data || []);
+            const profilesData = profilesResult.data || [];
+            const profilesMap = new Map(profilesData.map(p => [p.id, p]));
+
+            const requestsData = (requestsResult.data || []).map(request => ({
+                ...request,
+                profiles: profilesMap.get(request.reported_by_id)
+            }));
+
+            setRequests(requestsData);
+            setProfiles(profilesData);
     
         } catch (error) {
             toast.error(`Failed to fetch data: ${error.message}`);

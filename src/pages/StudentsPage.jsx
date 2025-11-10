@@ -38,7 +38,7 @@ const StudentsPage = () => {
             const [studentsResult, allocationsResult] = await Promise.all([
                 supabase
                     .from('profiles')
-                    .select('id, full_name, email, course, contact, created_at')
+                    .select('id, full_name, email, course, phone, created_at')
                     .eq('role', 'Student')
                     .order('created_at', { ascending: false }),
                 supabase
@@ -77,7 +77,7 @@ const StudentsPage = () => {
                 student.full_name.toLowerCase().includes(lowercasedTerm) ||
                 student.email.toLowerCase().includes(lowercasedTerm) ||
                 (student.course && student.course.toLowerCase().includes(lowercasedTerm)) ||
-                (student.contact && student.contact.includes(lowercasedTerm))
+                (student.phone && student.phone.includes(lowercasedTerm))
             );
         }
 
@@ -158,7 +158,7 @@ const StudentsPage = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-base-content-secondary" />
                     <input
                         type="text"
-                        placeholder="Search by name, email, course, or contact..."
+                        placeholder="Search by name, email, course, or phone..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-base-200 dark:bg-dark-base-300 focus:ring-2 focus:ring-primary focus:border-primary transition"
@@ -180,7 +180,7 @@ const StudentsPage = () => {
                         <thead className="bg-base-200/50 dark:bg-dark-base-300/50">
                             <tr>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-base-content-secondary dark:text-dark-base-content-secondary uppercase tracking-wider">Name</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-base-content-secondary dark:text-dark-base-content-secondary uppercase tracking-wider">Contact</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-base-content-secondary dark:text-dark-base-content-secondary uppercase tracking-wider">Phone</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-base-content-secondary dark:text-dark-base-content-secondary uppercase tracking-wider">Course</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-base-content-secondary dark:text-dark-base-content-secondary uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-base-content-secondary dark:text-dark-base-content-secondary uppercase tracking-wider">Actions</th>
@@ -207,7 +207,7 @@ const StudentsPage = () => {
                                             <Link to={`/students/${student.id}`} className="text-primary hover:text-primary-focus dark:text-dark-primary dark:hover:text-dark-primary-focus font-semibold">{student.full_name}</Link>
                                             <p className="text-xs text-base-content-secondary dark:text-dark-base-content-secondary">{student.email}</p>
                                         </td>
-                                        <td className="px-6 py-5 whitespace-nowrap text-sm text-base-content-secondary dark:text-dark-base-content-secondary">{student.contact}</td>
+                                        <td className="px-6 py-5 whitespace-nowrap text-sm text-base-content-secondary dark:text-dark-base-content-secondary">{student.phone}</td>
                                         <td className="px-6 py-5 whitespace-nowrap text-sm text-base-content-secondary dark:text-dark-base-content-secondary">{student.course}</td>
                                         <td className="px-6 py-5 whitespace-nowrap text-sm">
                                             {allocatedStudentIds.has(student.id) ? (
@@ -259,8 +259,8 @@ const StudentsPage = () => {
                         <input type="text" name="course" id="course" defaultValue={currentStudent?.course || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
                     </div>
                     <div>
-                        <label htmlFor="contact" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Contact Number</label>
-                        <input type="tel" name="contact" id="contact" defaultValue={currentStudent?.contact || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
+                        <label htmlFor="phone" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Phone Number</label>
+                        <input type="tel" name="phone" id="phone" defaultValue={currentStudent?.phone || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
                     </div>
                     <div className="flex justify-end pt-4 space-x-3">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="inline-flex justify-center py-2 px-4 border border-base-300 dark:border-dark-base-300 shadow-sm text-sm font-medium rounded-lg text-base-content dark:text-dark-base-content bg-base-100 dark:bg-dark-base-200 hover:bg-base-200 dark:hover:bg-dark-base-300">Cancel</button>

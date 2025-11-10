@@ -21,23 +21,31 @@ const RoomAllocationPage = () => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [roomsRes, allocationsRes] = await Promise.all([
+            const [roomsRes, allocationsRes, studentsRes] = await Promise.all([
                 supabase.from('rooms').select('*').order('room_number'),
-                supabase.from('room_allocations').select('*, students(id, full_name, course, contact)').eq('is_active', true)
+                supabase.from('room_allocations').select('*').eq('is_active', true),
+                supabase.from('profiles').select('id, full_name, course, phone').eq('role', 'Student')
             ]);
 
             if (roomsRes.error) throw roomsRes.error;
             if (allocationsRes.error) throw allocationsRes.error;
+            if (studentsRes.error) throw studentsRes.error;
 
             const roomsData = roomsRes.data || [];
             const allocationsData = allocationsRes.data || [];
+            const studentsData = studentsRes.data || [];
+            const studentsMap = new Map(studentsData.map(s => [s.id, s]));
 
-            const allocationsByRoom = allocationsData.reduce((acc, alloc) => {
+            const allocationsWithStudentData = allocationsData.map(alloc => ({
+                ...alloc,
+                students: studentsMap.get(alloc.student_id)
+            })).filter(alloc => alloc.students);
+
+            const allocationsByRoom = allocationsWithStudentData.reduce((acc, alloc) => {
                 if (!acc[alloc.room_id]) {
                     acc[alloc.room_id] = [];
                 }
                 acc[alloc.room_id].push(alloc);
-                // Sort students alphabetically within each room
                 acc[alloc.room_id].sort((a, b) => a.students.full_name.localeCompare(b.students.full_name));
                 return acc;
             }, {});
@@ -45,14 +53,12 @@ const RoomAllocationPage = () => {
             setRooms(roomsData);
             setAllocations(allocationsByRoom);
             
-            // If a room was selected, update its details
             if (selectedRoom) {
                 const updatedSelectedRoom = roomsData.find(r => r.id === selectedRoom.id);
                 if (updatedSelectedRoom) {
                     setSelectedRoom(updatedSelectedRoom);
                 }
             } else if (roomsData.length > 0) {
-                // Select the first room by default
                 setSelectedRoom(roomsData[0]);
             }
 
@@ -61,7 +67,7 @@ const RoomAllocationPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedRoom]);
+    }, [selectedRoom?.id]);
 
     useEffect(() => {
         fetchData();
@@ -83,15 +89,13 @@ const RoomAllocationPage = () => {
         
         const toastId = toast.loading('Deallocating student...');
         try {
-            // This should ideally be a single RPC call to ensure atomicity
             const { error: updateAllocError } = await supabase
                 .from('room_allocations')
-                .update({ end_date: new Date().toISOString() })
+                .update({ end_date: new Date().toISOString(), is_active: false })
                 .eq('id', allocationId);
             
             if (updateAllocError) throw updateAllocError;
 
-            // Manually trigger room occupancy update
             await supabase.rpc('update_room_occupancy', { p_room_id: selectedRoom.id });
 
             toast.success(`${studentName} deallocated successfully.`, { id: toastId });
@@ -159,10 +163,10 @@ const RoomAllocationPage = () => {
                                             </div>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleAllocateClick(room); }}
-                                                disabled={isFull}
+                                                disabled={isFull || room.status !== 'Vacant'}
                                                 className="w-full mt-4 py-2 px-4 text-sm font-semibold rounded-lg bg-primary text-primary-content hover:bg-primary-focus disabled:bg-base-300 disabled:cursor-not-allowed dark:disabled:bg-dark-base-300"
                                             >
-                                                {isFull ? 'Room Full' : 'Allocate'}
+                                                {isFull ? 'Room Full' : (room.status !== 'Vacant' ? `Under ${room.status}` : 'Allocate')}
                                             </button>
                                         </motion.div>
                                     );

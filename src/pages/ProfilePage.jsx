@@ -31,7 +31,7 @@ const ProfilePage = () => {
         try {
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
-                .select('*')
+                .select('id, full_name, phone, course, joining_date, created_at')
                 .eq('id', user.id)
                 .single();
 
@@ -52,7 +52,7 @@ const ProfilePage = () => {
                     .eq('is_active', true)
                     .maybeSingle();
                 
-                if (!allocationError && allocationData && allocationData.rooms) {
+                if (!allocationError && allocationData) {
                     finalProfile.room_number = allocationData.rooms.room_number;
                 }
             }
@@ -122,7 +122,7 @@ const ProfilePage = () => {
                                 <ProfileInfoItem icon={<Mail size={20} />} label="Email Address" value={profile.email} />
                             </div>
                             <div className="md:pl-6">
-                                <ProfileInfoItem icon={<Phone size={20} />} label="Contact Number" value={profile.contact} />
+                                <ProfileInfoItem icon={<Phone size={20} />} label="Phone Number" value={profile.phone} />
                                 {profile.role === 'Student' && <ProfileInfoItem icon={<BookOpen size={20} />} label="Course" value={profile.course} />}
                             </div>
                         </div>

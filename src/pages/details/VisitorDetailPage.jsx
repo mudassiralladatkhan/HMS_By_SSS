@@ -20,18 +20,30 @@ const VisitorDetailPage = () => {
         const fetchVisitor = async () => {
             if (!id) return;
             setLoading(true);
-            const { data, error } = await supabase
-                .from('visitors')
-                .select('*, students(full_name)')
-                .eq('id', id)
-                .single();
+            try {
+                const { data: visitorData, error: visitorError } = await supabase
+                    .from('visitors')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
 
-            if (error) {
+                if (visitorError) throw visitorError;
+
+                const { data: studentData, error: studentError } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', visitorData.student_id)
+                    .single();
+
+                setVisitor({
+                    ...visitorData,
+                    students: studentData || { full_name: 'N/A' }
+                });
+            } catch(error) {
                 toast.error('Visitor log not found.');
-            } else {
-                setVisitor(data);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchVisitor();
     }, [id]);

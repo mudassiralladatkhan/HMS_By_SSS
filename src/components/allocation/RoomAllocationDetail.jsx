@@ -31,10 +31,10 @@ const RoomAllocationDetail = ({ room, allocations, onDeallocate }) => {
                             <div>
                                 <p className="font-semibold">{alloc.students.full_name}</p>
                                 <p className="text-sm text-base-content-secondary">{alloc.students.course}</p>
-                                {alloc.students.contact && (
+                                {alloc.students.phone && (
                                     <p className="flex items-center text-sm text-base-content-secondary mt-1">
                                         <Phone className="w-3 h-3 mr-1.5" />
-                                        {alloc.students.contact}
+                                        {alloc.students.phone}
                                     </p>
                                 )}
                             </div>

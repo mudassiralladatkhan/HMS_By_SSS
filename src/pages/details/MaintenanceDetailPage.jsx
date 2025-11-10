@@ -21,18 +21,31 @@ const MaintenanceDetailPage = () => {
         const fetchRequest = async () => {
             if (!id) return;
             setLoading(true);
-            const { data, error } = await supabase
-                .from('maintenance_requests')
-                .select('*, profiles:reported_by_id(full_name)')
-                .eq('id', id)
-                .single();
+            try {
+                const { data: requestData, error: requestError } = await supabase
+                    .from('maintenance_requests')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
 
-            if (error) {
+                if (requestError) throw requestError;
+
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', requestData.reported_by_id)
+                    .single();
+
+                setRequest({
+                    ...requestData,
+                    profiles: profileData || { full_name: 'N/A' }
+                });
+
+            } catch (error) {
                 toast.error('Maintenance request not found.');
-            } else {
-                setRequest(data);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchRequest();
     }, [id]);

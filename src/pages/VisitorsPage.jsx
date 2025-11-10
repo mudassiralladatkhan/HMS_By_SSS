@@ -36,19 +36,28 @@ const VisitorsPage = () => {
             const [visitorsResult, studentsResult] = await Promise.all([
                 supabase
                     .from('visitors')
-                    .select('id, visitor_name, student_id, check_in_time, check_out_time, status, students(id, full_name)')
+                    .select('id, visitor_name, student_id, check_in_time, check_out_time, status')
                     .order('check_in_time', { ascending: false }),
                 supabase
-                    .from('students')
+                    .from('profiles')
                     .select('id, full_name')
+                    .eq('role', 'Student')
                     .order('full_name')
             ]);
     
             if (visitorsResult.error) throw visitorsResult.error;
             if (studentsResult.error) throw studentsResult.error;
+            
+            const studentsData = studentsResult.data || [];
+            const studentsMap = new Map(studentsData.map(s => [s.id, s]));
+
+            const visitorsData = (visitorsResult.data || []).map(visitor => ({
+                ...visitor,
+                students: studentsMap.get(visitor.student_id)
+            }));
     
-            setVisitors(visitorsResult.data || []);
-            setStudents(studentsResult.data || []);
+            setVisitors(visitorsData);
+            setStudents(studentsData);
     
         } catch (error) {
             toast.error(`Failed to fetch data: ${error.message}`);

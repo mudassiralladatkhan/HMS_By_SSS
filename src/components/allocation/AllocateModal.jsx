@@ -18,13 +18,24 @@ const AllocateModal = ({ isOpen, onClose, room, onAllocationSuccess }) => {
             const fetchUnallocatedStudents = async () => {
                 setLoading(true);
                 try {
-                    // This should be an RPC for efficiency, but this works for now.
-                    const { data, error } = await supabase.rpc('get_unallocated_students');
+                    const { data: allStudents, error: studentsError } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, email, phone, course')
+                        .eq('role', 'Student');
+                    if (studentsError) throw studentsError;
 
-                    if (error) throw error;
+                    const { data: allocations, error: allocationsError } = await supabase
+                        .from('room_allocations')
+                        .select('student_id')
+                        .eq('is_active', true);
+                    if (allocationsError) throw allocationsError;
+
+                    const allocatedStudentIds = new Set(allocations.map(a => a.student_id));
+                    const unallocatedStudents = allStudents.filter(s => !allocatedStudentIds.has(s.id));
                     
-                    // The RPC should return students already ordered by full_name
-                    setStudents(data || []);
+                    unallocatedStudents.sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+                    setStudents(unallocatedStudents || []);
                 } catch (error) {
                     toast.error(`Failed to fetch students: ${error.message}`);
                     setStudents([]);
@@ -42,7 +53,7 @@ const AllocateModal = ({ isOpen, onClose, room, onAllocationSuccess }) => {
         return students.filter(student =>
             student.full_name.toLowerCase().includes(lowercasedTerm) ||
             student.email.toLowerCase().includes(lowercasedTerm) ||
-            (student.contact && student.contact.toLowerCase().includes(lowercasedTerm))
+            (student.phone && student.phone.toLowerCase().includes(lowercasedTerm))
         );
     }, [students, debouncedSearchTerm]);
 
@@ -78,7 +89,7 @@ const AllocateModal = ({ isOpen, onClose, room, onAllocationSuccess }) => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-base-content-secondary" />
                     <input
                         type="text"
-                        placeholder="Search by name, email, or mobile..."
+                        placeholder="Search by name, email, or phone..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 rounded-lg bg-base-200 dark:bg-dark-base-300 focus:ring-2 focus:ring-primary focus:border-primary transition"
@@ -103,10 +114,10 @@ const AllocateModal = ({ isOpen, onClose, room, onAllocationSuccess }) => {
                                         <span className="text-xs text-base-content-secondary">{student.course}</span>
                                     </div>
                                     <p className="text-sm text-base-content-secondary">{student.email}</p>
-                                    {student.contact && (
+                                    {student.phone && (
                                         <p className="flex items-center text-sm text-base-content-secondary mt-1">
                                             <Phone className="w-3 h-3 mr-1.5" />
-                                            {student.contact}
+                                            {student.phone}
                                         </p>
                                     )}
                                 </li>

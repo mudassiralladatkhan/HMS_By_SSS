@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 const EditProfileModal = ({ isOpen, onClose, profile, onProfileUpdate }) => {
     const [formData, setFormData] = useState({
         full_name: '',
-        contact: '',
+        phone: '',
         course: ''
     });
     const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ const EditProfileModal = ({ isOpen, onClose, profile, onProfileUpdate }) => {
         if (profile) {
             setFormData({
                 full_name: profile.full_name || '',
-                contact: profile.contact || '',
+                phone: profile.phone || '',
                 course: profile.course || ''
             });
         }
@@ -35,7 +35,7 @@ const EditProfileModal = ({ isOpen, onClose, profile, onProfileUpdate }) => {
             .from('profiles')
             .update({
                 full_name: formData.full_name,
-                contact: formData.contact,
+                phone: formData.phone,
                 course: formData.course
             })
             .eq('id', profile.id);
@@ -58,8 +58,8 @@ const EditProfileModal = ({ isOpen, onClose, profile, onProfileUpdate }) => {
                     <input type="text" name="full_name" id="full_name" value={formData.full_name} onChange={handleChange} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
                 </div>
                 <div>
-                    <label htmlFor="contact" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Contact Number</label>
-                    <input type="tel" name="contact" id="contact" value={formData.contact} onChange={handleChange} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
+                    <label htmlFor="phone" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Phone Number</label>
+                    <input type="tel" name="phone" id="phone" value={formData.phone} onChange={handleChange} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
                 </div>
                 {profile?.role === 'Student' && (
                     <div>

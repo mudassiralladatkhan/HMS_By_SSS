@@ -21,18 +21,36 @@ const FeeDetailPage = () => {
         const fetchFee = async () => {
             if (!id) return;
             setLoading(true);
-            const { data, error } = await supabase
-                .from('fees')
-                .select('*, students(full_name)')
-                .eq('id', id)
-                .single();
+            try {
+                const { data: feeData, error: feeError } = await supabase
+                    .from('fees')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
 
-            if (error) {
+                if (feeError) throw feeError;
+
+                const { data: studentData, error: studentError } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', feeData.student_id)
+                    .single();
+                
+                if (studentError) {
+                   // Non-fatal, we can still show the fee details
+                   console.error("Could not fetch student name for fee record");
+                }
+
+                setFee({
+                    ...feeData,
+                    students: studentData || { full_name: 'N/A' }
+                });
+
+            } catch (error) {
                 toast.error('Fee record not found.');
-            } else {
-                setFee(data);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchFee();
     }, [id]);

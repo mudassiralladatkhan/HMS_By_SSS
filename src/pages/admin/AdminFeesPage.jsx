@@ -38,19 +38,28 @@ const AdminFeesPage = () => {
             const [feesResult, studentsResult] = await Promise.all([
                 supabase
                     .from('fees')
-                    .select('id, amount, due_date, status, payment_date, student_id, students(id, full_name)')
+                    .select('id, amount, due_date, status, payment_date, student_id')
                     .order('due_date', { ascending: false }),
                 supabase
-                    .from('students')
+                    .from('profiles')
                     .select('id, full_name')
+                    .eq('role', 'Student')
                     .order('full_name')
             ]);
     
             if (feesResult.error) throw feesResult.error;
             if (studentsResult.error) throw studentsResult.error;
+            
+            const studentsData = studentsResult.data || [];
+            const studentsMap = new Map(studentsData.map(s => [s.id, s]));
+
+            const feesData = (feesResult.data || []).map(fee => ({
+                ...fee,
+                students: studentsMap.get(fee.student_id)
+            }));
     
-            setFees(feesResult.data || []);
-            setStudents(studentsResult.data || []);
+            setFees(feesData);
+            setStudents(studentsData);
     
         } catch (error) {
             toast.error(`Failed to fetch data: ${error.message}`);
