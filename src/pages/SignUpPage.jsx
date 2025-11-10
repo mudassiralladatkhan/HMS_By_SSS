@@ -11,7 +11,7 @@ function SignUpPage() {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [mobileNumber, setMobileNumber] = useState('');
+    const [contact, setContact] = useState('');
     const [course, setCourse] = useState('');
     const [role, setRole] = useState('Student');
     const [joiningDate, setJoiningDate] = useState(new Date().toISOString().slice(0, 10));
@@ -25,7 +25,7 @@ function SignUpPage() {
         const optionsData = {
             full_name: fullName,
             role: role,
-            mobile_number: mobileNumber,
+            contact: contact,
             joining_date: joiningDate,
             room_number: roomNumber,
         };
@@ -123,8 +123,8 @@ function SignUpPage() {
                         </div>
                         
                         <div>
-                            <label htmlFor="mobileNumber" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">
-                                Mobile Number
+                            <label htmlFor="contact" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">
+                                Contact Number
                             </label>
                             <div className="mt-1 relative rounded-md shadow-sm">
                                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -132,10 +132,10 @@ function SignUpPage() {
                                 </div>
                                 <input
                                     type="tel"
-                                    name="mobileNumber"
-                                    id="mobileNumber"
-                                    value={mobileNumber}
-                                    onChange={(e) => setMobileNumber(e.target.value)}
+                                    name="contact"
+                                    id="contact"
+                                    value={contact}
+                                    onChange={(e) => setContact(e.target.value)}
                                     className="block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-200 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content pl-10 py-3 focus:border-primary dark:focus:border-dark-primary focus:ring-primary dark:focus:ring-dark-primary sm:text-sm"
                                     placeholder="e.g. +14155552671"
                                     required
