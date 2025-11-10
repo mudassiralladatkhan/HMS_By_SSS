@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import PageHeader from '../components/ui/PageHeader';
@@ -21,6 +21,7 @@ const itemVariants = {
 };
 
 const StudentsPage = () => {
+    const navigate = useNavigate();
     const [students, setStudents] = useState([]);
     const [allocatedStudentIds, setAllocatedStudentIds] = useState(new Set());
     const [loading, setLoading] = useState(true);
@@ -36,8 +37,9 @@ const StudentsPage = () => {
             setLoading(true);
             const [studentsResult, allocationsResult] = await Promise.all([
                 supabase
-                    .from('students')
-                    .select('id, full_name, email, course, contact, created_at')
+                    .from('profiles')
+                    .select('id, full_name, email, course, mobile_number, created_at')
+                    .eq('role', 'Student')
                     .order('created_at', { ascending: false }),
                 supabase
                     .from('room_allocations')
@@ -90,8 +92,8 @@ const StudentsPage = () => {
     }, [students, debouncedSearchTerm, filterStatus, allocatedStudentIds]);
 
     const openAddModal = () => {
-        setCurrentStudent(null);
-        setIsModalOpen(true);
+        // Redirect to signup for creating new users; profiles require auth.users
+        navigate('/signup');
     };
 
     const openEditModal = (student) => {
@@ -101,7 +103,7 @@ const StudentsPage = () => {
 
     const handleDelete = async (studentId) => {
         if (window.confirm('Are you sure you want to delete this student?')) {
-            const { error } = await supabase.from('students').delete().eq('id', studentId);
+            const { error } = await supabase.from('profiles').delete().eq('id', studentId);
             if (error) {
                 toast.error(error.message);
             } else {
@@ -116,14 +118,19 @@ const StudentsPage = () => {
         setFormLoading(true);
         const formData = new FormData(e.target);
         const studentData = Object.fromEntries(formData.entries());
+        // Ensure role is Student for creations
+        if (!currentStudent) {
+            studentData.role = 'Student';
+        }
 
         let error;
         if (currentStudent) {
-            const { error: updateError } = await supabase.from('students').update(studentData).eq('id', currentStudent.id);
+            const { error: updateError } = await supabase.from('profiles').update(studentData).eq('id', currentStudent.id);
             error = updateError;
         } else {
-            const { error: insertError } = await supabase.from('students').insert([studentData]);
-            error = insertError;
+            toast.error('Creating a new student must be done via Sign Up.');
+            setFormLoading(false);
+            return;
         }
 
         if (error) {
@@ -204,7 +211,7 @@ const StudentsPage = () => {
                                             <Link to={`/students/${student.id}`} className="text-primary hover:text-primary-focus dark:text-dark-primary dark:hover:text-dark-primary-focus font-semibold">{student.full_name}</Link>
                                             <p className="text-xs text-base-content-secondary dark:text-dark-base-content-secondary">{student.email}</p>
                                         </td>
-                                        <td className="px-6 py-5 whitespace-nowrap text-sm text-base-content-secondary dark:text-dark-base-content-secondary">{student.contact}</td>
+                                        <td className="px-6 py-5 whitespace-nowrap text-sm text-base-content-secondary dark:text-dark-base-content-secondary">{student.mobile_number}</td>
                                         <td className="px-6 py-5 whitespace-nowrap text-sm text-base-content-secondary dark:text-dark-base-content-secondary">{student.course}</td>
                                         <td className="px-6 py-5 whitespace-nowrap text-sm">
                                             {allocatedStudentIds.has(student.id) ? (
@@ -256,8 +263,8 @@ const StudentsPage = () => {
                         <input type="text" name="course" id="course" defaultValue={currentStudent?.course || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
                     </div>
                     <div>
-                        <label htmlFor="contact" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Contact</label>
-                        <input type="tel" name="contact" id="contact" defaultValue={currentStudent?.contact || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
+                        <label htmlFor="mobile_number" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Mobile Number</label>
+                        <input type="tel" name="mobile_number" id="mobile_number" defaultValue={currentStudent?.mobile_number || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
                     </div>
                     <div className="flex justify-end pt-4 space-x-3">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="inline-flex justify-center py-2 px-4 border border-base-300 dark:border-dark-base-300 shadow-sm text-sm font-medium rounded-lg text-base-content dark:text-dark-base-content bg-base-100 dark:bg-dark-base-200 hover:bg-base-200 dark:hover:bg-dark-base-300">Cancel</button>

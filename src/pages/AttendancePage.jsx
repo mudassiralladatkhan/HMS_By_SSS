@@ -28,7 +28,7 @@ const AttendancePage = () => {
         const { data, error } = await supabase
             .from('profiles')
             .select('id, full_name')
-            .eq('role', 'student')
+            .eq('role', 'Student')
             .order('full_name');
 
         if (error) {
