@@ -31,20 +31,29 @@ const RoomsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formLoading, setFormLoading] = useState(false);
     const [currentRoom, setCurrentRoom] = useState(null);
+    const [unallocatedStudents, setUnallocatedStudents] = useState([]);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
 
     const fetchData = async () => {
+        // No setLoading(true) here to allow for silent refreshes
         try {
-            setLoading(true);
             const [roomsRes, allocationsRes] = await Promise.all([
                 supabase.from('rooms').select('*').order('room_number'),
-                supabase.from('room_allocations').select('room_id').eq('is_active', true)
+                supabase
+                    .from('room_allocations')
+                    .select('room_id, profiles(full_name)')
+                    .eq('is_active', true)
             ]);
             
             if (roomsRes.error) throw roomsRes.error;
             if (allocationsRes.error) throw allocationsRes.error;
 
             const allocationsByRoom = (allocationsRes.data || []).reduce((acc, alloc) => {
-                acc[alloc.room_id] = (acc[alloc.room_id] || 0) + 1;
+                if (!alloc.profiles) return acc;
+                if (!acc[alloc.room_id]) {
+                    acc[alloc.room_id] = [];
+                }
+                acc[alloc.room_id].push(alloc.profiles.full_name);
                 return acc;
             }, {});
 
@@ -60,12 +69,42 @@ const RoomsPage = () => {
         }
     };
 
+    const fetchUnallocatedStudents = async () => {
+        try {
+            const { data: allStudents, error: studentsError } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('role', 'Student')
+                .order('full_name');
+            if (studentsError) throw studentsError;
+
+            const { data: allocations, error: allocationsError } = await supabase
+                .from('room_allocations')
+                .select('student_id')
+                .eq('is_active', true);
+            if (allocationsError) throw allocationsError;
+
+            const allocatedStudentIds = new Set(allocations.map(a => a.student_id));
+            const unallocated = allStudents.filter(s => !allocatedStudentIds.has(s.id));
+            setUnallocatedStudents(unallocated);
+        } catch (error) {
+            toast.error(`Failed to fetch students: ${error.message}`);
+        }
+    };
+
     useEffect(() => {
         fetchData();
     }, []);
+    
+    useEffect(() => {
+        if (isModalOpen && !currentRoom) {
+            fetchUnallocatedStudents();
+        }
+    }, [isModalOpen, currentRoom]);
 
     const openAddModal = () => {
         setCurrentRoom(null);
+        setSelectedStudentId('');
         setIsModalOpen(true);
     };
 
@@ -74,9 +113,15 @@ const RoomsPage = () => {
         setIsModalOpen(true);
     };
 
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setSelectedStudentId('');
+        setCurrentRoom(null);
+    };
+
     const handleDelete = async (roomId) => {
-        const currentOccupants = allocations[roomId] || 0;
-        if (currentOccupants > 0) {
+        const currentOccupants = allocations[roomId] || [];
+        if (currentOccupants.length > 0) {
             toast.error('Cannot delete an occupied room. Please deallocate students first.');
             return;
         }
@@ -106,33 +151,62 @@ const RoomsPage = () => {
             return 1;
         };
 
-        const dataToSubmit = {
-            room_number: roomData.roomNumber,
-            type: roomData.type,
-            status: roomData.status || 'Vacant',
-            occupants: getCapacity(roomData.type),
-        };
-
-        let error;
-        if (currentRoom) {
-            const currentOccupants = allocations[currentRoom.id] || 0;
-            if (currentOccupants > dataToSubmit.occupants) {
-                toast.error(`Cannot change type. Room has ${currentOccupants} occupants, exceeding new capacity of ${dataToSubmit.occupants}.`);
+        if (currentRoom) { // EDIT LOGIC
+            const dataToSubmit = {
+                room_number: roomData.roomNumber,
+                type: roomData.type,
+                status: roomData.status,
+                occupants: getCapacity(roomData.type),
+            };
+            const currentOccupants = allocations[currentRoom.id] || [];
+            if (currentOccupants.length > dataToSubmit.occupants) {
+                toast.error(`Cannot change type. Room has ${currentOccupants.length} occupants, exceeding new capacity of ${dataToSubmit.occupants}.`);
                 setFormLoading(false);
                 return;
             }
-            const { error: updateError } = await supabase.from('rooms').update(dataToSubmit).eq('id', currentRoom.id);
-            error = updateError;
-        } else {
-            const { error: insertError } = await supabase.from('rooms').insert([dataToSubmit]);
-            error = insertError;
-        }
+            const { error } = await supabase.from('rooms').update(dataToSubmit).eq('id', currentRoom.id);
+            if (error) {
+                toast.error(`Operation failed: ${error.message}`);
+            } else {
+                toast.success(`Room updated successfully!`);
+                closeModal();
+                fetchData();
+            }
+        } else { // ADD LOGIC
+            const dataToInsert = {
+                room_number: roomData.roomNumber,
+                type: roomData.type,
+                status: 'Vacant', // Always create as Vacant
+                occupants: getCapacity(roomData.type),
+            };
 
-        if (error) {
-            toast.error(`Operation failed: ${error.message}`);
-        } else {
-            toast.success(`Room ${currentRoom ? 'updated' : 'added'} successfully!`);
-            setIsModalOpen(false);
+            const { data: newRoom, error: insertError } = await supabase
+                .from('rooms')
+                .insert(dataToInsert)
+                .select()
+                .single();
+
+            if (insertError) {
+                toast.error(`Failed to add room: ${insertError.message}`);
+                setFormLoading(false);
+                return;
+            }
+
+            if (selectedStudentId && newRoom) {
+                const { error: rpcError } = await supabase.rpc('allocate_room', {
+                    p_student_id: selectedStudentId,
+                    p_room_id: newRoom.id,
+                });
+
+                if (rpcError) {
+                    toast.error(`Room created, but allocation failed: ${rpcError.message}`);
+                } else {
+                    toast.success('Room added and student allocated successfully!');
+                }
+            } else {
+                toast.success('Room added successfully!');
+            }
+            closeModal();
             fetchData();
         }
         setFormLoading(false);
@@ -157,7 +231,7 @@ const RoomsPage = () => {
                     animate="visible"
                 >
                     {rooms.map(room => {
-                        const currentOccupants = allocations[room.id] || 0;
+                        const currentOccupants = allocations[room.id] || [];
                         return (
                             <motion.div
                                 key={room.id}
@@ -185,11 +259,20 @@ const RoomsPage = () => {
                                     </div>
                                     <p className="text-sm text-base-content-secondary dark:text-dark-base-content-secondary mt-1">{room.type}</p>
                                 </div>
-                                <div className="mt-4 flex items-center text-sm text-base-content-secondary dark:text-dark-base-content-secondary">
-                                    <Users className="w-4 h-4 mr-2" />
-                                    <span>
-                                        {currentOccupants} / {room.occupants} Occupants
-                                    </span>
+                                <div className="mt-4">
+                                    <div className="flex items-center text-sm text-base-content-secondary dark:text-dark-base-content-secondary">
+                                        <Users className="w-4 h-4 mr-2" />
+                                        <span>
+                                            {currentOccupants.length} / {room.occupants} Occupants
+                                        </span>
+                                    </div>
+                                    {currentOccupants.length > 0 && (
+                                        <div className="mt-2 text-xs text-base-content-secondary dark:text-dark-base-content-secondary space-y-1">
+                                            {currentOccupants.map((name, index) => (
+                                                <p key={index} className="truncate">- {name}</p>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         )
@@ -205,7 +288,7 @@ const RoomsPage = () => {
                 </div>
             )}
 
-            <Modal title={currentRoom ? 'Edit Room' : 'Add New Room'} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+            <Modal title={currentRoom ? 'Edit Room' : 'Add New Room'} isOpen={isModalOpen} onClose={closeModal}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label htmlFor="roomNumber" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Room Number</label>
@@ -219,18 +302,37 @@ const RoomsPage = () => {
                             <option>Triple</option>
                         </select>
                     </div>
+                    
+                    {!currentRoom && (
+                        <div>
+                            <label htmlFor="student_id" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Allocate Student (Optional)</label>
+                            <select
+                                id="student_id"
+                                name="student_id"
+                                value={selectedStudentId}
+                                onChange={(e) => setSelectedStudentId(e.target.value)}
+                                className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                            >
+                                <option value="">None (Create as Vacant)</option>
+                                {unallocatedStudents.length > 0 ? unallocatedStudents.map(student => (
+                                    <option key={student.id} value={student.id}>{student.full_name}</option>
+                                )) : <option disabled>No unallocated students</option>}
+                            </select>
+                        </div>
+                    )}
+
                     {currentRoom && (
                         <div>
                             <label htmlFor="status" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Status</label>
                             <select id="status" name="status" defaultValue={currentRoom?.status} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm">
-                                <option>Vacant</option>
-                                <option>Occupied</option>
-                                <option>Maintenance</option>
+                                <option value="Vacant">Vacant</option>
+                                <option value="Occupied">Occupied</option>
+                                <option value="Maintenance">Maintenance</option>
                             </select>
                         </div>
                     )}
                     <div className="flex justify-end pt-4 space-x-3">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="inline-flex justify-center py-2 px-4 border border-base-300 dark:border-dark-base-300 shadow-sm text-sm font-medium rounded-lg text-base-content dark:text-dark-base-content bg-base-100 dark:bg-dark-base-200 hover:bg-base-200 dark:hover:bg-dark-base-300">Cancel</button>
+                        <button type="button" onClick={closeModal} className="inline-flex justify-center py-2 px-4 border border-base-300 dark:border-dark-base-300 shadow-sm text-sm font-medium rounded-lg text-base-content dark:text-dark-base-content bg-base-100 dark:bg-dark-base-200 hover:bg-base-200 dark:hover:bg-dark-base-300">Cancel</button>
                         <button type="submit" disabled={formLoading} className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-lg text-primary-content bg-primary hover:bg-primary-focus disabled:opacity-50">
                             {formLoading && <Loader className="animate-spin h-4 w-4 mr-2" />}
                             {currentRoom ? 'Save Changes' : 'Add Room'}

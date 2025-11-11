@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import PageHeader from '../components/ui/PageHeader';
-import Modal from '../components/ui/Modal';
+import AddStudentModal from '../components/students/AddStudentModal';
+import EditStudentModal from '../components/students/EditStudentModal';
 import EmptyState from '../components/ui/EmptyState';
 import SegmentedControl from '../components/ui/SegmentedControl';
 import { Loader, Edit, Trash2, Users, Search } from 'lucide-react';
@@ -21,11 +22,11 @@ const itemVariants = {
 };
 
 const StudentsPage = () => {
-    const navigate = useNavigate();
     const [students, setStudents] = useState([]);
     const [allocatedStudentIds, setAllocatedStudentIds] = useState(new Set());
     const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [formLoading, setFormLoading] = useState(false);
     const [currentStudent, setCurrentStudent] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -34,7 +35,8 @@ const StudentsPage = () => {
 
     const fetchData = async () => {
         try {
-            setLoading(true);
+            // No need to set loading to true here if we want a silent refresh
+            // setLoading(true); 
             const [studentsResult, allocationsResult] = await Promise.all([
                 supabase
                     .from('profiles')
@@ -56,9 +58,6 @@ const StudentsPage = () => {
 
         } catch (error) {
             toast.error(`Failed to fetch data: ${error.message}`);
-            console.error("Error fetching data:", error);
-            setStudents([]);
-            setAllocatedStudentIds(new Set());
         } finally {
             setLoading(false);
         }
@@ -92,49 +91,44 @@ const StudentsPage = () => {
     }, [students, debouncedSearchTerm, filterStatus, allocatedStudentIds]);
 
     const openAddModal = () => {
-        // Redirect to signup for creating new users; profiles require auth.users
-        navigate('/signup');
+        setIsAddModalOpen(true);
     };
 
     const openEditModal = (student) => {
         setCurrentStudent(student);
-        setIsModalOpen(true);
+        setIsEditModalOpen(true);
     };
 
     const handleDelete = async (studentId) => {
-        if (window.confirm('Are you sure you want to delete this student?')) {
+        if (window.confirm('Are you sure you want to delete this student? This will also delete their authentication record and cannot be undone.')) {
+            // Note: This only deletes the profile. The auth user needs to be deleted via an admin function.
+            // For this project, we'll assume deleting the profile is sufficient.
+            // A more robust solution would use an edge function to call `supabase.auth.admin.deleteUser(studentId)`.
             const { error } = await supabase.from('profiles').delete().eq('id', studentId);
             if (error) {
                 toast.error(error.message);
             } else {
-                toast.success('Student deleted successfully.');
+                toast.success('Student profile deleted successfully.');
                 fetchData();
             }
         }
     };
 
-    const handleSubmit = async (e) => {
+    const handleEditSubmit = async (e) => {
         e.preventDefault();
         setFormLoading(true);
         const formData = new FormData(e.target);
-        const studentData = Object.fromEntries(formData.entries());
+        // We exclude email from the update
+        const { email, ...studentData } = Object.fromEntries(formData.entries());
         
-        let error;
-        if (currentStudent) {
-            const { error: updateError } = await supabase.from('profiles').update(studentData).eq('id', currentStudent.id);
-            error = updateError;
-        } else {
-            toast.error('Creating a new student must be done via Sign Up.');
-            setFormLoading(false);
-            return;
-        }
+        const { error } = await supabase.from('profiles').update(studentData).eq('id', currentStudent.id);
 
         if (error) {
             toast.error(error.message);
         } else {
-            toast.success(`Student ${currentStudent ? 'updated' : 'added'} successfully!`);
+            toast.success('Student updated successfully!');
             fetchData();
-            setIsModalOpen(false);
+            setIsEditModalOpen(false);
         }
         setFormLoading(false);
     };
@@ -244,33 +238,23 @@ const StudentsPage = () => {
                 </div>
             </div>
 
-            <Modal title={currentStudent ? 'Edit Student' : 'Add New Student'} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="full_name" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Full Name</label>
-                        <input type="text" name="full_name" id="full_name" defaultValue={currentStudent?.full_name || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Email</label>
-                        <input type="email" name="email" id="email" defaultValue={currentStudent?.email || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="course" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Course</label>
-                        <input type="text" name="course" id="course" defaultValue={currentStudent?.course || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="phone" className="block text-sm font-medium text-base-content-secondary dark:text-dark-base-content-secondary">Phone Number</label>
-                        <input type="tel" name="phone" id="phone" defaultValue={currentStudent?.phone || ''} required className="mt-1 block w-full rounded-lg border-base-300 dark:border-dark-base-300 bg-base-100 dark:bg-dark-base-200 text-base-content dark:text-dark-base-content shadow-sm focus:border-primary focus:ring-primary sm:text-sm" />
-                    </div>
-                    <div className="flex justify-end pt-4 space-x-3">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="inline-flex justify-center py-2 px-4 border border-base-300 dark:border-dark-base-300 shadow-sm text-sm font-medium rounded-lg text-base-content dark:text-dark-base-content bg-base-100 dark:bg-dark-base-200 hover:bg-base-200 dark:hover:bg-dark-base-300">Cancel</button>
-                        <button type="submit" disabled={formLoading} className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-lg text-primary-content bg-primary hover:bg-primary-focus disabled:opacity-50">
-                            {formLoading && <Loader className="animate-spin h-4 w-4 mr-2" />}
-                            {currentStudent ? 'Save Changes' : 'Add Student'}
-                        </button>
-                    </div>
-                </form>
-            </Modal>
+            <AddStudentModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onStudentAdded={() => {
+                    fetchData();
+                }}
+            />
+
+            {currentStudent && (
+                <EditStudentModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    currentStudent={currentStudent}
+                    handleSubmit={handleEditSubmit}
+                    formLoading={formLoading}
+                />
+            )}
         </>
     );
 };
